@@ -162,9 +162,18 @@ def get_kuzu_db_connection(db_path: str = DEFAULT_KUZU_DB_PATH, read_only: bool 
     # Resolve a concrete database file path. Kuzu >=0.11 expects a file path,
     # not a directory; the env var KUZU_PATH typically points at a mounted
     # volume directory, so we append a filename when needed.
+    # Heuristic: treat the path as a *directory* location (and append a file
+    # name inside it) when it has no file extension, regardless of whether it
+    # already exists. Ensure the parent directory exists so kuzu can create the
+    # database file.
     resolved_path = db_path
-    if os.path.isdir(db_path) or (not os.path.exists(db_path) and db_path.rstrip("/").endswith(("kuzu_db", "kuzu"))):
+    base = os.path.basename(db_path.rstrip("/"))
+    has_extension = "." in base
+    if not has_extension:
         resolved_path = os.path.join(db_path, "kuzu.database")
+    parent = os.path.dirname(resolved_path)
+    if parent and not os.path.exists(parent):
+        os.makedirs(parent, exist_ok=True)
     try:
         db = kuzu.Database(resolved_path)
         # TODO: Kuzu Python API for read_only mode needs to be confirmed.
