@@ -176,4 +176,7 @@ site/
 # MkDocs and Sphinx build artifacts
 *.html
 docs/docs_src/_static/
-docs/docs_src/api/api/ 
+docs/docs_src/api/api/ vcf_uploads/*.checkpoint
+vcf_uploads/4wngq9.vcf
+vcf_uploads/*.vcf
+vcf_uploads/*.vcf.gz
