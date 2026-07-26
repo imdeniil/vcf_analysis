@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 # VCF Analysis Agent — PRODUCTION image (target: production).
 # Hardened: non-root user, minimal runtime. Referenced by docker-compose.production.yml.
-# Runtime deps come from requirements.txt (NOT pyproject.toml).
 
 ARG PYTHON_VERSION=3.11
 ARG BCFTOOLS_VERSION=1.19
@@ -70,7 +69,11 @@ RUN pip install --no-index --find-links=/tmp/wheels -r /tmp/requirements.txt \
     && pip install --no-index --find-links=/tmp/wheels --no-deps vcf_analysis_agent \
     && rm -rf /tmp/wheels /tmp/requirements.txt
 
+# bcftools + htslib (bgzip + tabix for region queries / indexing).
 COPY --from=builder /usr/local/bin/bcftools /usr/local/bin/bcftools
+COPY --from=builder /usr/local/bin/bgzip /usr/local/bin/bgzip
+COPY --from=builder /usr/local/bin/tabix /usr/local/bin/tabix
+COPY --from=builder /usr/local/bin/htsfile /usr/local/bin/htsfile
 COPY --from=builder /usr/local/lib/libhts* /usr/local/lib/
 RUN ldconfig && bcftools --version | head -1
 

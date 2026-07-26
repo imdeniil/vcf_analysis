@@ -32,9 +32,15 @@ dev = [
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
-# backend-path is not strictly necessary if setup.py is not used and pyproject.toml has all info
-# but can be kept for clarity or future use with setup.cfg/setup.py
-# backend-path = ["."]
+
+# Explicitly tell setuptools where the package lives. Without this, auto-discovery
+# can produce a wheel that omits parts of src/vcf_agent (e.g. when built in
+# environments with a different cwd), so the installed package lags behind edits.
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+vcf_agent = ["py.typed"]
 
 [tool.coverage.run]
 source = ["src/vcf_agent"]

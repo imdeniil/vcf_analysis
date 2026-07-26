@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/build
+# htslib ships bgzip + tabix binaries (needed for region queries & indexing).
 RUN curl -fsSL https://github.com/samtools/htslib/releases/download/${HTSLIB_VERSION}/htslib-${HTSLIB_VERSION}.tar.bz2 -o htslib.tar.bz2 \
     && tar -xjf htslib.tar.bz2 \
     && cd htslib-${HTSLIB_VERSION} \
@@ -45,7 +46,6 @@ RUN curl -fsSL https://github.com/samtools/bcftools/releases/download/${BCFTOOLS
 WORKDIR /build
 COPY pyproject.toml requirements.txt ./
 COPY src/ ./src/
-
 RUN pip install --upgrade pip wheel \
     && HTSLIB_MODE=external pip wheel --wheel-dir=/opt/wheels -r requirements.txt \
     && pip wheel --wheel-dir=/opt/wheels pytest-cov \
@@ -68,18 +68,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libcurl4 libssl3 libbz2-1.0 liblzma5 zlib1g libdeflate0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Wheels + requirements.txt (needed to drive the offline install list).
 COPY --from=builder /opt/wheels /tmp/wheels
 COPY requirements.txt /tmp/requirements.txt
-
-# Install everything offline from the local wheelhouse.
 RUN pip install --no-index --find-links=/tmp/wheels -r /tmp/requirements.txt \
     && pip install --no-index --find-links=/tmp/wheels --no-deps vcf_analysis_agent \
     && rm -rf /tmp/wheels /tmp/requirements.txt
 
+# bcftools + htslib (also installs bgzip + tabix for region queries / indexing).
 COPY --from=builder /usr/local/bin/bcftools /usr/local/bin/bcftools
+COPY --from=builder /usr/local/bin/bgzip /usr/local/bin/bgzip
+COPY --from=builder /usr/local/bin/tabix /usr/local/bin/tabix
+COPY --from=builder /usr/local/bin/htsfile /usr/local/bin/htsfile
 COPY --from=builder /usr/local/lib/libhts* /usr/local/lib/
-RUN ldconfig && bcftools --version | head -1
+RUN ldconfig && bcftools --version | head -1 && tabix --version | head -1 && bgzip --version | head -1
 
 WORKDIR /app
 RUN mkdir -p /app/data /app/lancedb /app/kuzu_db /app/sample_data
