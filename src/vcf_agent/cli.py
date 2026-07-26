@@ -111,8 +111,9 @@ def main():
         help="Disable chain-of-thought reasoning (raw output mode)"
     )
     parser.add_argument(
-        "--model", type=str, choices=["ollama", "openai", "cerebras"], default="ollama",
-        help="Select model provider (default: ollama)"
+        "--model", type=str, choices=["zai", "ollama", "openai", "cerebras"], default="zai",
+        help="Select model provider (default: zai = Z.AI GLM). "
+             "Others: ollama (local), openai, cerebras."
     )
     parser.add_argument(
         "--credentials", type=str, 
@@ -899,13 +900,14 @@ def main():
         from vcf_agent.agent import get_agent_with_session
         from vcf_agent.config import SessionConfig
         
-        model_provider = cast(Literal["ollama", "openai", "cerebras"], args.model)
+        model_provider = cast(Literal["zai", "ollama", "openai", "cerebras"], args.model)
         session_config = SessionConfig(
             raw_mode=args.raw if args.raw else None,
             model_provider=model_provider,
             credentials_file=args.credentials,
             reference_fasta=args.reference,
-            ollama_model_name=args.ollama_model if args.ollama_model else None # Pass it here
+            ollama_model_name=args.ollama_model if args.ollama_model else None, # Pass it here
+            zai_model_name=os.getenv("ZAI_MODEL_ID", "glm-5.2"),  # Z.AI GLM model override via env
         )
         
         agent_instance = get_agent_with_session( # Renamed to avoid conflict

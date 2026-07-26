@@ -983,14 +983,15 @@ def get_cerebras_model(credential_manager=None):
 
 def get_agent_with_session(
     session_config: Optional[SessionConfig] = None,
-    model_provider: Literal["ollama", "openai", "cerebras"] = "ollama"
+    model_provider: Literal["ollama", "openai", "cerebras", "zai"] = "zai"
 ):
     """
     Creates a VCF Analysis Agent with the specified session configuration and model provider.
     
     Args:
         session_config: Optional session configuration
-        model_provider: Model provider to use ("ollama", "openai", "cerebras")
+        model_provider: Model provider to use ("zai", "ollama", "openai", "cerebras").
+            "zai" (Z.AI GLM via LiteLLM) is the default.
     
     Returns:
         Agent: Configured Strands agent instance
@@ -1022,7 +1023,28 @@ def get_agent_with_session(
 
     # Initialize model and agent
     model = None
-    if model_provider == "ollama":
+    if model_provider == "zai":
+        # Z.AI (GLM) via LiteLLM. Coding Plan key uses a dedicated endpoint:
+        # https://api.z.ai/api/coding/paas/v4  (override via ZAI_API_BASE env).
+        # Reasoning models (glm-5.x) return CoT in a separate `reasoning_content`
+        # field, so `content` stays clean and existing JSON parsing works.
+        zai_model_id = "zai/glm-5.2"  # default
+        if session_config and session_config.zai_model_name:
+            # Allow plain "glm-5.2" or already-prefixed "zai/glm-5.2"
+            name = session_config.zai_model_name
+            zai_model_id = name if name.startswith("zai/") else f"zai/{name}"
+        # Env override has highest priority
+        env_model = os.getenv("ZAI_MODEL_ID")
+        if env_model:
+            zai_model_id = env_model if env_model.startswith("zai/") else f"zai/{env_model}"
+        zai_api_base = os.getenv(
+            "ZAI_API_BASE",
+            session_config.zai_api_base if session_config else "https://api.z.ai/api/coding/paas/v4",
+        )
+        # LiteLLM reads ZAI_API_KEY from the environment automatically.
+        model = LiteLLMModel(model_id=zai_model_id, api_base=zai_api_base)
+        print(f"Using Z.AI (GLM) model: {zai_model_id} via {zai_api_base}")
+    elif model_provider == "ollama":
         ollama_model_id = "mistral" # Default if not in session_config
         if session_config and session_config.ollama_model_name:
             ollama_model_id = session_config.ollama_model_name

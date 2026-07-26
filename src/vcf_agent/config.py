@@ -107,7 +107,8 @@ class SessionConfig:
             - False: enables chain-of-thought (CoT, default)
             - None: uses environment variable or CLI flag (see README)
         model_provider (str):
-            - "ollama": Use local Ollama models (default)
+            - "zai": Use Z.AI (GLM) via LiteLLM (default, Coding Plan endpoint)
+            - "ollama": Use local Ollama models
             - "openai": Use OpenAI API
             - "cerebras": Use Cerebras API
         credentials_file (Optional[str]):
@@ -130,11 +131,13 @@ class SessionConfig:
     def __init__(
         self, 
         raw_mode: Optional[bool] = None,
-        model_provider: Literal["ollama", "openai", "cerebras"] = "ollama",
+        model_provider: Literal["ollama", "openai", "cerebras", "zai"] = "zai",
         credentials_file: Optional[str] = None,
         reference_fasta: Optional[str] = None,
         ollama_model_name: Optional[str] = "qwen3:4b",  # Default to qwen3:4b
         ollama_base_url: Optional[str] = "http://localhost:11434",
+        zai_model_name: Optional[str] = "glm-5.2",  # Z.AI (GLM) model, Coding Plan
+        zai_api_base: Optional[str] = "https://api.z.ai/api/coding/paas/v4",
         memory_optimization: Optional[MemoryOptimizationConfig] = None
     ):
         """Initializes an instance of the class with configuration settings for model interaction.
@@ -157,6 +160,8 @@ class SessionConfig:
         self.reference_fasta = reference_fasta
         self.ollama_model_name = ollama_model_name # Store it
         self.ollama_base_url = ollama_base_url
+        self.zai_model_name = zai_model_name  # Z.AI (GLM) model name
+        self.zai_api_base = zai_api_base      # Z.AI Coding Plan endpoint
         self.memory_optimization = memory_optimization or MemoryOptimizationConfig()
 
     def __repr__(self) -> str:
@@ -168,5 +173,7 @@ class SessionConfig:
             f"reference_fasta={repr(self.reference_fasta)}, "
             f"ollama_model_name='{self.ollama_model_name}', "
             f"ollama_base_url={repr(self.ollama_base_url)}, "
+            f"zai_model_name='{self.zai_model_name}', "
+            f"zai_api_base={repr(self.zai_api_base)}, "
             f"memory_optimization={self.memory_optimization.optimization_level})"
         ) 

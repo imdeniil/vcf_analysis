@@ -42,6 +42,10 @@ services:
       # AI provider configuration (secrets loaded from external files)
       OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
       ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      # Z.AI (GLM) — default model provider. Coding Plan endpoint + key.
+      ZAI_API_KEY: ${ZAI_API_KEY:-}
+      ZAI_API_BASE: ${ZAI_API_BASE:-https://api.z.ai/api/coding/paas/v4}
+      ZAI_MODEL_ID: ${ZAI_MODEL_ID:-glm-5.2}
     ports:
       - "8080:8080"
     volumes:

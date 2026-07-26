@@ -80,7 +80,7 @@ ollama
 httpx
 httpcore
 h11
-litellm
+litellm>=1.91.0  # Z.AI (GLM) provider support; pinned for prebuilt wheels
 
 # Phase 5: Apache Iggy + Streaming Dependencies
 iggy-py>=0.4.0
