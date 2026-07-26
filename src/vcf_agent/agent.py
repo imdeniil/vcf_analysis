@@ -220,6 +220,35 @@ def validate_vcf(filepath: str) -> str:
     print(f"[TOOL {tool_name}] Exiting. Result: {result_str_to_return[:100]}...")
     return result_str_to_return
 
+
+def _coerce_args_list(args: Any) -> PyList[str]:
+    """Normalize the `args` parameter of bcftools_*_tool wrappers into a list of str.
+
+    Strands 1.50 has a bug: even though the tool's JSON schema declares
+    `args` as `type: array` and the model correctly sends a JSON array, the
+    value reaching the Python function is the array serialized to a STRING
+    (e.g. the string '["-n", "3", "file.vcf.gz"]'). bcftools then receives a
+    single bogus argument and fails. We detect both shapes (real list, or a
+    JSON string / shell string) and always return list[str].
+    """
+    if isinstance(args, list):
+        return [str(a) for a in args]
+    if isinstance(args, str):
+        s = args.strip()
+        # JSON array form: '["-n","3","f.vcf"]'
+        if s.startswith("["):
+            try:
+                parsed = json.loads(s)
+                if isinstance(parsed, list):
+                    return [str(a) for a in parsed]
+            except json.JSONDecodeError:
+                pass
+        # Shell form: '-n 3 file.vcf'  -> split on whitespace
+        return s.split()
+    # Fallback: wrap anything else as a single-element list.
+    return [str(args)]
+
+
 @tool
 def bcftools_view_tool(args: PyList[str]) -> str:
     """
@@ -230,7 +259,7 @@ def bcftools_view_tool(args: PyList[str]) -> str:
     Returns:
         str: Output or error from bcftools.
     """
-    rc, out, err = _bcftools_view(args)
+    rc, out, err = _bcftools_view(_coerce_args_list(args))
     return out if rc == 0 else err
 
 @tool
@@ -243,7 +272,7 @@ def bcftools_query_tool(args: PyList[str]) -> str:
     Returns:
         str: Output or error from bcftools.
     """
-    rc, out, err = _bcftools_query(args)
+    rc, out, err = _bcftools_query(_coerce_args_list(args))
     return out if rc == 0 else err
 
 @tool
@@ -256,7 +285,7 @@ def bcftools_filter_tool(args: PyList[str]) -> str:
     Returns:
         str: Output or error from bcftools.
     """
-    rc, out, err = _bcftools_filter(args)
+    rc, out, err = _bcftools_filter(_coerce_args_list(args))
     return out if rc == 0 else err
 
 @tool
@@ -269,7 +298,7 @@ def bcftools_norm_tool(args: PyList[str]) -> str:
     Returns:
         str: Output or error from bcftools.
     """
-    rc, out, err = _bcftools_norm(args)
+    rc, out, err = _bcftools_norm(_coerce_args_list(args))
     return out if rc == 0 else err
 
 @tool
@@ -282,7 +311,7 @@ def bcftools_stats_tool(args: PyList[str]) -> str:
     Returns:
         str: Output or error from bcftools.
     """
-    rc, out, err = _bcftools_stats(args)
+    rc, out, err = _bcftools_stats(_coerce_args_list(args))
     return out if rc == 0 else err
 
 @tool
@@ -295,7 +324,7 @@ def bcftools_annotate_tool(args: PyList[str]) -> str:
     Returns:
         str: Output or error from bcftools.
     """
-    rc, out, err = _bcftools_annotate(args)
+    rc, out, err = _bcftools_annotate(_coerce_args_list(args))
     return out if rc == 0 else err
 
 @tool
