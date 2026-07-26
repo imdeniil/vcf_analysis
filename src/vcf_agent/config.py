@@ -26,6 +26,7 @@ Usage:
     'bcftools'
 """
 
+import os
 from typing import Optional, Literal
 
 class MemoryOptimizationConfig:
@@ -85,19 +86,25 @@ class MemoryOptimizationConfig:
             self.streaming_batch_size = 50  # Larger batches for aggressive mode
     
     def get_embedding_dimensions(self) -> int:
-        """Get the appropriate embedding dimensions based on configuration."""
-        if self.dimension_reduction_enabled:
-            return self.target_dimensions
-        # Allow overriding the embedding model dimensionality via env so the
-        # vector store schema matches the locally served embedding model
-        # (default bge-m3 -> 1024). Falls back to 1536 for OpenAI text-embedding-3.
-        env_dim = _os.getenv("EMBEDDING_DIM")
+        """Get the appropriate embedding dimensions based on configuration.
+
+        Returns the dimensionality of the vectors that will actually be stored
+        in LanceDB. Resolution order:
+          1. If PCA reduction is enabled AND the target is smaller than the
+             raw model dim -> target_dimensions (reduced).
+          2. Otherwise -> the raw embedding model dim (EMBEDDING_DIM env, or
+             1536 as the OpenAI text-embedding-3-small default).
+        """
+        raw_dim = 1536  # default: OpenAI text-embedding-3-small
+        env_dim = os.getenv("EMBEDDING_DIM")
         if env_dim:
             try:
-                return int(env_dim)
+                raw_dim = int(env_dim)
             except ValueError:
                 pass
-        return 1536  # Original OpenAI embedding dimensions
+        if self.dimension_reduction_enabled and self.target_dimensions < raw_dim:
+            return self.target_dimensions
+        return raw_dim
     
     def is_optimized_model_enabled(self) -> bool:
         """Check if optimized vector models should be used."""

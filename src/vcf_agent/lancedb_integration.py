@@ -294,10 +294,13 @@ class DimensionReducer:
     PCA-based dimension reduction for embeddings.
     Integrated directly into the embedding service.
     """
-    def __init__(self, target_dimensions: int = 768):
+    def __init__(self, target_dimensions: int = 768, original_dimensions: int = 1536):
         """Initialize an object for dimensionality reduction using PCA.
         Parameters:
             - target_dimensions (int): Desired number of dimensions for the reduced dataset. Defaults to 768.
+            - original_dimensions (int): Dimensionality of the source embedding model.
+              Defaults to 1536 (OpenAI text-embedding-3-small); set to 1024 when
+              serving a local model such as bge-m3 via EMBEDDING_DIM.
         Returns:
             - None: The function does not return any value. It sets up internal state for future processing.
         Processing Logic:
@@ -307,7 +310,7 @@ class DimensionReducer:
             - Prepares to store training embeddings and specifies a minimum sample size for reliable PCA application.
             - Issues a warning when scikit-learn is unavailable, showing dimension reduction feature will not work."""
         self.target_dimensions = target_dimensions
-        self.original_dimensions = 1536
+        self.original_dimensions = original_dimensions
         self.pca_model = None
         self.scaler = None
         self.is_trained = False
@@ -424,22 +427,35 @@ class VariantEmbeddingService:
         else:
             self.embedding_cache = {}  # Simple dictionary cache
         
-        # Initialize dimension reduction
-        self.dimension_reducer = None
-        if self.memory_config.dimension_reduction_enabled and HAS_SKLEARN:
-            self.dimension_reducer = DimensionReducer(
-                target_dimensions=self.memory_config.target_dimensions
-            )
-        
-        # Initialize API client for embeddings.
         # Embeddings are INDEPENDENT from the chat LLM provider: a local
         # OpenAI-compatible server (LM Studio / Ollama / vLLM) serves the
         # embedding model (default: bge-m3, 1024-dim) regardless of which LLM
         # (Z.AI GLM, OpenAI, ...) powers the agent.
+        # NOTE: embedding_dim must be resolved BEFORE creating the DimensionReducer
+        # so PCA is trained against the correct input dimensionality.
         self.openai_client = None
         self.embedding_client = None  # OpenAI-compatible client (any provider)
         self.embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-bge-m3")
         self.embedding_dim = int(os.getenv("EMBEDDING_DIM", "1024"))
+
+        # Initialize dimension reduction.
+        # PCA reduces embeddings to target_dimensions (default 768). The reducer
+        # must know the *real* input dimensionality (original_dimensions) so it
+        # accepts training vectors that actually come from the served model
+        # (bge-m3=1024, OpenAI text-embedding-3-small=1536, ...).
+        self.dimension_reducer = None
+        if self.memory_config.dimension_reduction_enabled and HAS_SKLEARN:
+            # Guard: PCA target must be strictly smaller than the input dim.
+            if self.memory_config.target_dimensions < self.embedding_dim:
+                self.dimension_reducer = DimensionReducer(
+                    target_dimensions=self.memory_config.target_dimensions,
+                    original_dimensions=self.embedding_dim,
+                )
+            else:
+                logger.info(
+                    f"PCA reduction disabled: target ({self.memory_config.target_dimensions}) "
+                    f">= embedding dim ({self.embedding_dim}); nothing to reduce."
+                )
 
         provider = self.session_config.model_provider
         if provider == "openai":

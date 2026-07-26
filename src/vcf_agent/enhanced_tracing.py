@@ -497,16 +497,16 @@ class EnhancedTraceService:
         """Decorator for AI provider operations."""
         def decorator(func):
             @functools.wraps(func)
-            """Wraps a function to add AI provider span context for tracking execution details.
-            Parameters:
-                - func (function): The function to be wrapped, which can be asynchronous or synchronous.
-            Returns:
-                - function: The wrapped version of the input function with added span context attributes.
-            Processing Logic:
-                - Determines if the function is synchronous or asynchronous and uses the appropriate wrapper.
-                - Establishes an AI provider span context to track execution details such as function name, arguments, and success status.
-                - Handles exceptions by setting success attribute to false, while successful executions set it to true."""
             async def async_wrapper(*args, **kwargs):
+                """Wraps a function to add AI provider span context for tracking execution details.
+                Parameters:
+                    - func (function): The function to be wrapped, which can be asynchronous or synchronous.
+                Returns:
+                    - function: The wrapped version of the input function with added span context attributes.
+                Processing Logic:
+                    - Determines if the function is synchronous or asynchronous and uses the appropriate wrapper.
+                    - Establishes an AI provider span context to track execution details such as function name, arguments, and success status.
+                    - Handles exceptions by setting success attribute to false, while successful executions set it to true."""
                 """A wrapper for an asynchronous function that integrates tracing and error handling.
                 Parameters:
                     - *args: Arguments to be passed to the asynchronous function.
@@ -577,17 +577,18 @@ class EnhancedTraceService:
         """Decorator for VCF processing operations."""
         def decorator(func):
             @functools.wraps(func)
-            """Apply a decorator to a function to perform context logging during its execution.
-            Parameters:
-                - func (callable): The function to be wrapped by the decorator.
-            Returns:
-                - callable: A wrapped function that logs its execution context including arguments and success status.
-            Processing Logic:
-                - Establish a context for the operation before function execution.
-                - Log function name, argument count, and keyword argument count.
-                - Execute the function within this context.
-                - Capture and log the success status or handle exceptions accordingly."""
             def wrapper(*args, **kwargs):
+                """Apply a decorator to a function to perform context logging during its execution.
+                Parameters:
+                    - func (callable): The function to be wrapped by the decorator.
+                Returns:
+                    - callable: A wrapped function that logs its execution context including arguments and success status.
+                Processing Logic:
+                    - Establish a context for the operation before function execution.
+                    - Log function name, argument count, and keyword argument count.
+                    - Execute the function within this context.
+                    - Capture and log the success status or handle exceptions accordingly."""
+
                 """Wrapper function for executing a given function within a VCF operation context, recording attributes about the operation.
                 Parameters:
                     - *args: Variable length argument list passed to the wrapped function.
@@ -622,17 +623,18 @@ class EnhancedTraceService:
         """Decorator for memory optimization operations."""
         def decorator(func):
             @functools.wraps(func)
-            """A decorator for function memory context management.
-            Parameters:
-                - func (callable): The function to be wrapped and managed within a memory context.
-            Returns:
-                - callable: The wrapped function with added memory context and attribute management.
-            Processing Logic:
-                - Opens a memory context before executing the function, capturing it in a span.
-                - Sets memory attributes such as function name and optimization level.
-                - Upon successful function execution, sets a success attribute in the span.
-                - On exception, sets a failure attribute and re-raises the exception."""
             def wrapper(*args, **kwargs):
+                """A decorator for function memory context management.
+                Parameters:
+                    - func (callable): The function to be wrapped and managed within a memory context.
+                Returns:
+                    - callable: The wrapped function with added memory context and attribute management.
+                Processing Logic:
+                    - Opens a memory context before executing the function, capturing it in a span.
+                    - Sets memory attributes such as function name and optimization level.
+                    - Upon successful function execution, sets a success attribute in the span.
+                    - On exception, sets a failure attribute and re-raises the exception."""
+
                 """Wrapper function to execute another function while managing memory context and capturing its attributes.
                 Parameters:
                     - *args: Positional arguments to pass to the `func`.

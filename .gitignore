@@ -55,7 +55,8 @@ lancedb_test/
 # Containers
 *.img
 *.dockerfile
-Dockerfile*
+# NOTE: Dockerfile and docker/Dockerfile.production are tracked (used by
+# docker-compose); do NOT ignore them. Only ignore build artifacts below.
 .dockerignore
 
 # Test & Coverage
