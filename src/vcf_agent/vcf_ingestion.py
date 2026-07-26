@@ -73,6 +73,15 @@ class IngestionConfig:
     sample_name_override: Optional[str] = None
     embedding_dim: int = 1024
     max_memory_mb: int = 4096
+    # Incremental / nightly-ingest controls.
+    # checkpoint_path: where to persist the last-processed CHROM:POS so a run can
+    # be paused (Ctrl+C) and later resumed automatically. If None, no checkpoint
+    # file is written (original behaviour).
+    checkpoint_path: Optional[str] = None
+    # max_runtime_minutes: stop cleanly after this many minutes (writes the
+    # checkpoint first). Lets you run ingest during a bounded night window and
+    # free the machine for the day. None = no time limit.
+    max_runtime_minutes: Optional[float] = None
 
 @dataclass
 class IngestionResult:
@@ -84,6 +93,7 @@ class IngestionResult:
     kuzu_links: int = 0
     errors: List[str] = None
     duration_seconds: float = 0.0
+    message: str = "completed"
     
     def __post_init__(self):
         if self.errors is None:
@@ -302,12 +312,34 @@ class VCFIngestionPipeline:
         self.config = config
         self.validator = VCFValidator()
         self.streamer = VCFStreamer(
-            config.vcf_file, 
-            config.batch_size, 
+            config.vcf_file,
+            config.batch_size,
             config.resume_from
         )
         self.embedding_generator = EmbeddingGenerator(config.embedding_dim)
-        
+
+        # Real embedding service (bge-m3 via LM Studio / OpenAI-compatible server).
+        # Falls back to EmbeddingGenerator only if the service has no client.
+        try:
+            from .lancedb_integration import VariantEmbeddingService
+            from .config import SessionConfig
+            self.embedding_service = VariantEmbeddingService(SessionConfig())
+            if self.embedding_service.embedding_client is None and self.embedding_service.openai_client is None:
+                logger.warning(
+                    "No embedding client configured (EMBEDDING_BASE_URL unreachable?). "
+                    "Falling back to hash-based EmbeddingGenerator — similarity search "
+                    "will NOT be meaningful."
+                )
+                self.embedding_service = None
+            else:
+                logger.info(
+                    f"Using real embedding service: model={self.embedding_service.embedding_model}, "
+                    f"dim={self.embedding_service.embedding_dim}"
+                )
+        except Exception as e:
+            logger.warning(f"Could not init VariantEmbeddingService ({e}); using hash-based fallback")
+            self.embedding_service = None
+
         # Database connections (initialized in setup)
         self.lancedb_conn = None
         self.lancedb_table = None
@@ -412,38 +444,116 @@ class VCFIngestionPipeline:
             raise
     
     def _process_variants(self):
-        """Process variants in batches."""
+        """Process variants in batches, with optional checkpointing and time limit.
+
+        Supports incremental / nightly ingestion:
+        - On start, if --resume-from was not given but a checkpoint file exists,
+          resume from the saved CHROM:POS automatically.
+        - After every processed batch, write the current CHROM:POS to the
+          checkpoint file (so a Ctrl+C or a time-limit stop can be resumed).
+        - If max_runtime_minutes is set, stop cleanly once the budget is spent,
+          after writing the checkpoint.
+        - KeyboardInterrupt (Ctrl+C) writes the checkpoint before re-raising.
+        """
         logger.info("Processing variants...")
-        
+
+        # Auto-resume from checkpoint when --resume-from was not explicitly given.
+        if self.config.resume_from is None and self.config.checkpoint_path:
+            saved = self._read_checkpoint()
+            if saved:
+                logger.info(f"Auto-resuming from checkpoint: {saved}")
+                self.config.resume_from = saved
+                # Rebuild the streamer so it picks up the new resume point.
+                self.streamer = VCFStreamer(
+                    self.config.vcf_file, self.config.batch_size, self.config.resume_from
+                )
+
         # Initialize progress bar
         self.progress_bar = tqdm(
             total=self.total_variants,
             desc="Processing variants",
             unit="variants"
         )
-        
+
+        start_time = time.time()
+        time_limit_reached = False
         try:
             for batch in self.streamer.stream_variants():
                 self._process_batch(batch)
                 self.progress_bar.update(len(batch))
-                
+
+                # Persist progress so the run can be paused/resumed.
+                if self.config.checkpoint_path and self.streamer.current_position:
+                    self._write_checkpoint(self.streamer.current_position)
+
+                # Time-budget check (for bounded nightly runs).
+                if self.config.max_runtime_minutes is not None:
+                    elapsed_min = (time.time() - start_time) / 60.0
+                    if elapsed_min >= self.config.max_runtime_minutes:
+                        logger.info(
+                            f"Reached max_runtime_minutes={self.config.max_runtime_minutes} "
+                            f"(elapsed {elapsed_min:.1f}min). Stopping cleanly; resume with the same command."
+                        )
+                        time_limit_reached = True
+                        break
+        except KeyboardInterrupt:
+            logger.info("Interrupted by user (Ctrl+C). Checkpoint written; resume with the same command.")
+            if self.config.checkpoint_path and self.streamer.current_position:
+                self._write_checkpoint(self.streamer.current_position)
+            raise
         finally:
             if self.progress_bar:
                 self.progress_bar.close()
+
+        if time_limit_reached:
+            self.result.message = "stopped_after_time_budget"
+
+    def _write_checkpoint(self, position: str) -> None:
+        """Persist the last-processed CHROM:POS to the checkpoint file."""
+        try:
+            with open(self.config.checkpoint_path, "w", encoding="utf-8") as f:
+                f.write(position)
+        except Exception as e:
+            logger.warning(f"Could not write checkpoint {self.config.checkpoint_path}: {e}")
+
+    def _read_checkpoint(self) -> Optional[str]:
+        """Read the last-processed CHROM:POS from the checkpoint file, if any."""
+        try:
+            with open(self.config.checkpoint_path, "r", encoding="utf-8") as f:
+                pos = f.read().strip()
+            return pos or None
+        except FileNotFoundError:
+            return None
+        except Exception as e:
+            logger.warning(f"Could not read checkpoint {self.config.checkpoint_path}: {e}")
+            return None
     
     def _process_batch(self, batch: List[Dict[str, Any]]):
         """Process a single batch of variants."""
         try:
             # Prepare LanceDB records
             lancedb_records = []
-            for variant_data in batch:
-                # Generate embedding
-                embedding = self.embedding_generator.generate_embedding(variant_data)
-                
+
+            # Generate embeddings. Prefer the real bge-m3 service with TRUE batched
+            # HTTP requests (one round-trip per chunk) — this is ~10-100x faster than
+            # per-variant calls. Fall back to the hash-based EmbeddingGenerator only
+            # when no embedding server is configured.
+            embeddings: List[List[float]] = []
+            if self.embedding_service is not None:
+                descriptions = [
+                    self.embedding_service.generate_variant_description(v) for v in batch
+                ]
+                embeddings = self.embedding_service.generate_embeddings_batch(descriptions)
+            else:
+                for variant_data in batch:
+                    emb = self.embedding_generator.generate_embedding(variant_data)
+                    embeddings.append(emb.tolist())
+
+            for i, variant_data in enumerate(batch):
                 # Create LanceDB record
                 lancedb_record = {
                     'variant_id': variant_data['variant_id'],
-                    'embedding': embedding.tolist(),
+                    'embedding': embeddings[i],
                     'chrom': variant_data['chrom'],
                     'pos': variant_data['pos'],
                     'ref': variant_data['ref'],
@@ -451,7 +561,7 @@ class VCFIngestionPipeline:
                     'clinical_significance': None  # Could be populated from INFO field
                 }
                 lancedb_records.append(lancedb_record)
-            
+
             # Batch insert to LanceDB
             if lancedb_records:
                 add_variants(self.lancedb_table, lancedb_records)
@@ -551,10 +661,31 @@ class VCFIngestionPipeline:
         logger.info("✅ Ingestion finalized")
     
     def _cleanup(self):
-        """Clean up resources."""
+        """Clean up resources, including releasing the Kuzu database lock.
+
+        Kuzu takes an exclusive file lock on the database file; if the connection
+        is not closed, the next ingest run (e.g. a resume the following night)
+        fails with "Could not set lock on file". This is critical for the
+        pause/resume nightly workflow.
+        """
         if self.progress_bar:
             self.progress_bar.close()
-        
-        # Close database connections if needed
-        # Note: LanceDB and Kuzu connections are typically managed by their respective modules
+
+        # Release the Kuzu connection + its file lock.
+        # Kuzu locks the database file at the Database (C) level, so we must
+        # close BOTH the Connection and the underlying Database; closing only
+        # the Connection leaves the file lock in place and blocks the next run.
+        if self.kuzu_conn is not None:
+            try:
+                self.kuzu_conn.close()
+            except Exception as e:
+                logger.warning(f"Error closing Kuzu connection: {e}")
+            kuzu_db = getattr(self.kuzu_conn, "_kuzu_db", None)
+            if kuzu_db is not None:
+                try:
+                    kuzu_db.close()
+                except Exception as e:
+                    logger.warning(f"Error closing Kuzu database: {e}")
+            self.kuzu_conn = None
+
         logger.info("Cleanup completed") 

@@ -1102,8 +1102,24 @@ def get_agent_with_session(
     # agent.session_config = session_config # Example, if agent can hold custom attributes
     return agent
 
-# Default agent instance (uses env/CLI for RAW_MODE)
-agent = get_agent_with_session()
+# Default agent instance (uses env/CLI for RAW_MODE).
+# NOTE: this used to be a module-level call `agent = get_agent_with_session()`,
+# which eagerly opened a Kuzu database connection on EVERY `import vcf_agent`.
+# In the long-running container (CMD = tail -f /dev/null) that connection holds
+# an exclusive lock on the Kuzu file for the whole container lifetime, blocking
+# any subsequent `ingest-vcf` run with "Could not set lock on file".
+# We now create the default agent lazily via a module __getattr__ hook, so the
+# Kuzu lock is only taken when the agent is actually used (e.g. via the `ask`
+# command), not when the package is merely imported.
+def _get_default_agent():
+    return get_agent_with_session()
+
+# Backwards-compat: code that does `from vcf_agent.agent import agent` gets a
+# lazy proxy. We expose it via module PEP 562 __getattr__.
+def __getattr__(name):
+    if name == "agent":
+        return _get_default_agent()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 def extract_json_from_text(text: str) -> str:
     """

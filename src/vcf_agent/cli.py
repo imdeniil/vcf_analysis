@@ -196,6 +196,17 @@ def main():
     parser_ingest.add_argument("--validate-only", action="store_true", help="Only validate VCF file, no ingestion")
     parser_ingest.add_argument("--resume-from", type=str, help="Resume from specific position (CHROM:POS)")
     parser_ingest.add_argument("--sample-name-override", type=str, help="Override sample name for single-sample VCFs")
+    # Incremental / nightly-ingest controls.
+    parser_ingest.add_argument(
+        "--checkpoint", type=str, default=None,
+        help="File path to persist the last-processed CHROM:POS. Enables pause/resume: "
+             "re-running with the same --checkpoint auto-resumes from where it stopped."
+    )
+    parser_ingest.add_argument(
+        "--max-runtime-minutes", type=float, default=None,
+        help="Stop cleanly after this many minutes (checkpoint is written first). "
+             "Use for bounded nightly runs; resume the next night with the same command."
+    )
 
     # Kuzu: populate from VCF
     parser_populate_kuzu = subparsers.add_parser("populate-kuzu-from-vcf", help="Populate Kuzu graph database from a VCF file.")
@@ -486,7 +497,9 @@ def main():
                     batch_size=args.batch_size,
                     validate_only=args.validate_only,
                     resume_from=args.resume_from,
-                    sample_name_override=args.sample_name_override
+                    sample_name_override=args.sample_name_override,
+                    checkpoint_path=args.checkpoint,
+                    max_runtime_minutes=args.max_runtime_minutes,
                 )
                 
                 # Initialize and run ingestion pipeline

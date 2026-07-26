@@ -636,39 +636,71 @@ class VariantEmbeddingService:
     
     def generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
         """
-        Generate embeddings for multiple texts with streaming optimization.
-        
+        Generate embeddings for multiple texts using TRUE batch requests.
+
+        The OpenAI-compatible embeddings API (LM Studio / vLLM / OpenAI) accepts
+        a LIST of inputs in a single HTTP call, which is dramatically faster than
+        N separate requests (one round-trip instead of N, plus the model batches
+        internally). For a local bge-m3 in LM Studio this turns ~0.4 var/s into
+        ~5-50 var/s depending on batch size and hardware.
+
+        Falls back to per-text generation only if no embedding client is
+        configured (e.g. provider=openai path or dev environment).
+
         Args:
             texts: List of texts to generate embeddings for.
-            
+
         Returns:
-            List of embedding vectors.
+            List of embedding vectors, same length and order as `texts`.
         """
         if not texts:
             return []
-        
+
         self.generation_stats["batch_generations"] += 1
-        batch_size = self.memory_config.streaming_batch_size
-        all_embeddings = []
-        
-        # Process in batches for memory efficiency
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            batch_embeddings = []
-            
-            for text in batch:
-                embedding = self.generate_embedding_sync(text)
-                batch_embeddings.append(embedding)
-            
-            all_embeddings.extend(batch_embeddings)
-            
-            # Memory cleanup between batches if needed
+        chunk_size = self.memory_config.streaming_batch_size
+        all_embeddings: List[List[float]] = []
+
+        # Fast path: true batched requests against the OpenAI-compatible server.
+        if self.embedding_client is not None:
+            for i in range(0, len(texts), chunk_size):
+                chunk = texts[i:i + chunk_size]
+                try:
+                    resp = self.embedding_client.embeddings.create(
+                        model=self.embedding_model, input=chunk
+                    )
+                    # OpenAI-compatible servers return data[] in input order.
+                    chunk_embeddings = [d.embedding for d in resp.data]
+                    all_embeddings.extend(chunk_embeddings)
+                    self.generation_stats["embeddings_generated"] += len(chunk_embeddings)
+                    # Populate the cache so subsequent single-text lookups hit.
+                    for txt, emb in zip(chunk, chunk_embeddings):
+                        cache_key = f"{self.session_config.model_provider}:{txt}"
+                        if hasattr(self.embedding_cache, "put"):
+                            self.embedding_cache.put(cache_key, emb)
+                        elif isinstance(self.embedding_cache, dict):
+                            self.embedding_cache[cache_key] = emb
+                except Exception as e:
+                    logger.error(f"Batch embedding request failed at chunk {i}: {e}; falling back to per-text")
+                    for text in chunk:
+                        all_embeddings.append(self.generate_embedding_sync(text))
+                if self.memory_config.memory_management_enabled:
+                    self._check_memory_threshold()
+            logger.info(
+                f"Generated {len(all_embeddings)} embeddings via batched requests "
+                f"(chunk_size={chunk_size}, model={self.embedding_model})"
+            )
+            return all_embeddings
+
+        # Fallback: no embedding client (e.g. openai provider or dev mode).
+        for i in range(0, len(texts), chunk_size):
+            chunk = texts[i:i + chunk_size]
+            for text in chunk:
+                all_embeddings.append(self.generate_embedding_sync(text))
             if self.memory_config.memory_management_enabled:
                 self._check_memory_threshold()
-        
-        logger.info(f"Generated {len(all_embeddings)} embeddings using streaming batch processing (batch_size: {batch_size})")
+        logger.info(f"Generated {len(all_embeddings)} embeddings (per-text fallback)")
         return all_embeddings
-    
+
     def get_embedding_dimensions(self) -> int:
         """Get the current embedding dimensions based on configuration."""
         return self.memory_config.get_embedding_dimensions()

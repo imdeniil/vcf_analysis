@@ -48,6 +48,33 @@ docker compose exec vcf-agent python -m vcf_agent.cli ingest-vcf \
 Полный набор опций: `--lancedb-path`, `--kuzu-path`, `--table-name`, `--batch-size`,
 `--validate-only`, `--sample-name-override`.
 
+### 2a. Ночной инкрементальный режим (для больших файлов)
+
+Полногеномный файл (600K+ вариантов) через локальный bge-m3 грузится ~5+ часов.
+Чтобы разбить загрузку на ночи и освободить компьютер днём, используйте
+`--checkpoint` и `--max-runtime-minutes`:
+
+```bash
+# Запуск на ночь (например, на 4 часа). Тот же ключ и для первой ночи.
+docker compose exec vcf-agent python -m vcf_agent.cli ingest-vcf \
+    --vcf-file /app/vcf/file.vcf.gz \
+    --batch-size 64 \
+    --checkpoint /app/vcf/file.checkpoint \
+    --max-runtime-minutes 240
+```
+
+Что происходит:
+- После каждого батча позиция (CHROM:POS) дописывается в файл `file.checkpoint`.
+- При `--max-runtime-minutes` (или Ctrl+C) загрузка останавливается корректно,
+  записав контрольную точку.
+- **На следующую ночь запустите ту же команду** — она автоматически продолжит
+  с сохранённой позиции (ничего не дублируется, данные накапливаются).
+- Увидеть прогресс: `docker compose exec vcf-agent cat /app/vcf/file.checkpoint`.
+
+Так можно грузить сколько угодно ночей подряд, пока файл не закончится.
+Когда контрольная точка достигнет последнего варианта, следующий запуск
+сообщит "0 variants processed" — загрузка завершена.
+
 ## 3. Работа с загруженными данными
 
 Все команды выполняются через `docker compose exec vcf-agent ...`.

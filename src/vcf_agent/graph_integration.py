@@ -132,9 +132,17 @@ def get_managed_kuzu_connection() -> kuzu.Connection:
             # if db_path is different, but here we use a fixed path.
             # Kuzu's Database object itself handles the singleton nature for a given path.
             conn = get_kuzu_db_connection(db_path=DEFAULT_KUZU_DB_PATH)
-            create_enhanced_schema(conn) # Use enhanced schema instead of basic schema
+            # Use the BASIC schema (Variant/Sample/ObservedIn with variant_id,
+            # chrom, sample_id). The ingestion pipeline (vcf_utils.populate_kuzu_from_vcf,
+            # vcf_ingestion._process_kuzu_batch) and the add_variant/add_sample/
+            # link_variant_to_sample helpers all expect these property names.
+            # The enhanced schema (id/chr, Gene/Analysis) is a separate, parallel
+            # subsystem used only by data_store_manager / batch_add_genomic_data;
+            # creating it here would collide with the basic Variant/Sample tables
+            # and break every ingest-vcf run with "Cannot find property variant_id".
+            create_schema(conn)
             _kuzu_main_connection = conn
-            print("Managed Kuzu connection initialized and enhanced schema verified.")
+            print("Managed Kuzu connection initialized and basic schema verified.")
         except Exception as e:
             # Log the error appropriately in a real application
             print(f"Failed to initialize managed Kuzu connection or create enhanced schema: {e}")
@@ -180,9 +188,16 @@ def get_kuzu_db_connection(db_path: str = DEFAULT_KUZU_DB_PATH, read_only: bool 
         # As of recent versions, read_only might be set at Database level or not directly via Connection.
         # For now, we assume write access by default.
         # if read_only:
-        #     conn = kuzu.Connection(db, access_mode=kuzu.AccessMode.READ_ONLY) # Example, check actual API
+        #   conn = kuzu.Connection(db, access_mode=kuzu.AccessMode.READ_ONLY) # Example, check actual API
         # else:
         conn = kuzu.Connection(db)
+        # Keep a strong reference to the Database object on the connection.
+        # Kuzu holds an exclusive file lock at the Database (C) level; if the
+        # Database Python wrapper is garbage-collected the underlying handle may
+        # still linger and block the next ingest with "Could not set lock on
+        # file". Storing it here lets _cleanup() call conn._kuzu_db.close()
+        # deterministically, which is required for the pause/resume nightly flow.
+        conn._kuzu_db = db  # type: ignore[attr-defined]
         print(f"Successfully connected to Kuzu database at: {resolved_path}")
         return conn
     except Exception as e:
