@@ -5,6 +5,7 @@ This module provides comprehensive functions to interact with a Kuzu graph datab
 implementing the DECISION-001 specifications for genomic relationship modeling.
 Includes schema definition, data loading, and optimized querying for VCF analysis.
 """
+import os
 import kuzu
 import pandas as pd # Added for DataFrame conversion
 import pyarrow as pa # Ensure pyarrow is imported
@@ -18,8 +19,9 @@ import threading
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Default path for the Kuzu database
-DEFAULT_KUZU_DB_PATH = "./kuzu_db"
+# Default path for the Kuzu database. Honours the KUZU_PATH env var set in the
+# docker-compose runtime (typically a mounted volume directory, e.g. /app/kuzu_db).
+DEFAULT_KUZU_DB_PATH = os.getenv("KUZU_PATH", "./kuzu_db")
 
 # Global variable to hold the managed Kuzu connection
 _kuzu_main_connection: Optional[kuzu.Connection] = None
@@ -148,14 +150,23 @@ def get_kuzu_db_connection(db_path: str = DEFAULT_KUZU_DB_PATH, read_only: bool 
     Initializes a Kuzu database at the given path and returns a connection.
 
     Args:
-        db_path: Path to the Kuzu database directory.
+        db_path: Path to the Kuzu database. May be a directory (a volume mount,
+            e.g. KUZU_PATH=/app/kuzu_db) or a plain file path. Kuzu >=0.11
+            rejects directories, so when db_path points to an existing
+            directory we transparently use `<db_path>/kuzu.database`.
         read_only: If True, opens the database in read-only mode.
 
     Returns:
         A Kuzu database connection object.
     """
+    # Resolve a concrete database file path. Kuzu >=0.11 expects a file path,
+    # not a directory; the env var KUZU_PATH typically points at a mounted
+    # volume directory, so we append a filename when needed.
+    resolved_path = db_path
+    if os.path.isdir(db_path) or (not os.path.exists(db_path) and db_path.rstrip("/").endswith(("kuzu_db", "kuzu"))):
+        resolved_path = os.path.join(db_path, "kuzu.database")
     try:
-        db = kuzu.Database(db_path)
+        db = kuzu.Database(resolved_path)
         # TODO: Kuzu Python API for read_only mode needs to be confirmed.
         # As of recent versions, read_only might be set at Database level or not directly via Connection.
         # For now, we assume write access by default.
@@ -163,10 +174,10 @@ def get_kuzu_db_connection(db_path: str = DEFAULT_KUZU_DB_PATH, read_only: bool 
         #     conn = kuzu.Connection(db, access_mode=kuzu.AccessMode.READ_ONLY) # Example, check actual API
         # else:
         conn = kuzu.Connection(db)
-        print(f"Successfully connected to Kuzu database at: {db_path}")
+        print(f"Successfully connected to Kuzu database at: {resolved_path}")
         return conn
     except Exception as e:
-        print(f"Error connecting to Kuzu database at {db_path}: {e}")
+        print(f"Error connecting to Kuzu database at {resolved_path}: {e}")
         raise
 
 def create_schema(conn: kuzu.Connection) -> None:

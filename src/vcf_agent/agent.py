@@ -1042,7 +1042,13 @@ def get_agent_with_session(
             session_config.zai_api_base if session_config else "https://api.z.ai/api/coding/paas/v4",
         )
         # LiteLLM reads ZAI_API_KEY from the environment automatically.
-        model = LiteLLMModel(model_id=zai_model_id, api_base=zai_api_base)
+        # NOTE: strands >=1.50 validates LiteLLMModel kwargs against a TypedDict
+        # (model_id, params, ...) and rejects top-level api_base/api_key. They
+        # must go inside `params`, which is forwarded to litellm.completion().
+        model = LiteLLMModel(
+            model_id=zai_model_id,
+            params={"api_base": zai_api_base},
+        )
         print(f"Using Z.AI (GLM) model: {zai_model_id} via {zai_api_base}")
     elif model_provider == "ollama":
         ollama_model_id = "mistral" # Default if not in session_config
