@@ -13,8 +13,10 @@ import pandas as pd # Ensure pandas is imported for DataFrame operations
 from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import os
 import numpy as np
 import time
+from openai import OpenAI  # OpenAI-compatible client for embeddings (LM Studio / etc.)
 
 # Import Kuzu integration functions
 from . import graph_integration
@@ -429,13 +431,33 @@ class VariantEmbeddingService:
                 target_dimensions=self.memory_config.target_dimensions
             )
         
-        # Initialize API client
-        if self.session_config.model_provider == "openai":
+        # Initialize API client for embeddings.
+        # Embeddings are INDEPENDENT from the chat LLM provider: a local
+        # OpenAI-compatible server (LM Studio / Ollama / vLLM) serves the
+        # embedding model (default: bge-m3, 1024-dim) regardless of which LLM
+        # (Z.AI GLM, OpenAI, ...) powers the agent.
+        self.openai_client = None
+        self.embedding_client = None  # OpenAI-compatible client (any provider)
+        self.embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-bge-m3")
+        self.embedding_dim = int(os.getenv("EMBEDDING_DIM", "1024"))
+
+        provider = self.session_config.model_provider
+        if provider == "openai":
+            # Original path: OpenAI cloud embeddings.
             try:
                 credential_manager = CredentialManager(self.session_config.credentials_file)
                 self.openai_client = OpenAIClient(credential_manager)
             except Exception as e:
                 logger.warning(f"Failed to initialize OpenAI client for embeddings: {e}")
+        elif provider in ("zai", "ollama", "cerebras"):
+            # Local/embedgins endpoint via OpenAI-compatible API (LM Studio, etc.).
+            base_url = os.getenv("EMBEDDING_BASE_URL", "http://localhost:1234/v1")
+            api_key = os.getenv("EMBEDDING_API_KEY", "lm-studio")
+            try:
+                self.embedding_client = OpenAI(base_url=base_url, api_key=api_key)
+                logger.info(f"Embedding client initialized: {base_url} model={self.embedding_model}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize embedding client ({base_url}): {e}")
         
         # Performance tracking
         self.generation_stats = {
@@ -527,20 +549,35 @@ class VariantEmbeddingService:
         
         try:
             # Generate original embedding
-            if self.session_config.model_provider == "openai" and self.openai_client:
+            provider = self.session_config.model_provider
+            original_embedding = None
+            if provider == "openai" and self.openai_client:
                 response = self.openai_client.client.embeddings.create(
                     model="text-embedding-3-small",
                     input=text
                 )
                 original_embedding = response.data[0].embedding
-            elif self.session_config.model_provider == "ollama":
-                # Placeholder for Ollama implementation
-                logger.warning("Ollama embeddings not yet implemented, using random vector")
-                original_embedding = np.random.normal(0, 1, 1536).tolist()
-            else:
-                # Fallback to random embedding for development
-                logger.warning(f"Embedding provider {self.session_config.model_provider} not implemented, using random vector")
-                original_embedding = np.random.normal(0, 1, 1536).tolist()
+            elif provider in ("zai", "ollama", "cerebras") and self.embedding_client is not None:
+                # Real embeddings via OpenAI-compatible local server (LM Studio, etc.)
+                response = self.embedding_client.embeddings.create(
+                    model=self.embedding_model,
+                    input=text
+                )
+                original_embedding = response.data[0].embedding
+
+            # Fallback ONLY when no embedding client is available (e.g. server down,
+            # dev environment without a local model). Produces a deterministic-shape
+            # random vector so the pipeline does not crash, but similarity search on
+            # such vectors is meaningless and a warning is logged.
+            if original_embedding is None:
+                dim = self.embedding_dim
+                logger.warning(
+                    f"No embedding client for provider '{provider}' "
+                    f"(is the embedding server running at EMBEDDING_BASE_URL?). "
+                    f"Falling back to a {dim}-dim random vector — similarity search "
+                    f"will NOT be meaningful."
+                )
+                original_embedding = np.random.normal(0, 1, dim).tolist()
             
             # Add to dimension reducer training if applicable
             if self.dimension_reducer and not self.dimension_reducer.is_trained:

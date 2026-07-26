@@ -129,16 +129,21 @@ class TestVariantEmbeddingService:
         assert "reference allele T" in description
         assert "alternate allele C" in description
     
-    @patch('src.vcf_agent.lancedb_integration.np.random.normal')
-    def test_generate_embedding_fallback(self, mock_random):
-        """Test embedding generation fallback to random vector."""
-        mock_random.return_value.tolist.return_value = [0.1] * 1536
-        
+    def test_generate_embedding_fallback_when_no_client(self, monkeypatch):
+        """When no embedding server is reachable, fall back to a random vector
+        whose size matches the configured embedding dimension (bge-m3 = 1024)."""
         service = VariantEmbeddingService()
+        # Force the fallback path: no embedding client available.
+        service.embedding_client = None
+        service.openai_client = None
+        # bge-m3 default dimension
+        service.embedding_dim = 1024
+
         embedding = service.generate_embedding_sync("test text")
-        
-        assert len(embedding) == 1536
-        mock_random.assert_called_once()
+
+        # Random fallback vector must match the configured dim, not a hardcoded 1536.
+        assert len(embedding) == 1024
+        assert all(isinstance(v, float) for v in embedding)
 
 
 class TestLanceDBOperations:

@@ -45,6 +45,11 @@ services:
       - ZAI_API_KEY=${ZAI_API_KEY:-}
       - ZAI_API_BASE=${ZAI_API_BASE:-https://api.z.ai/api/coding/paas/v4}
       - ZAI_MODEL_ID=${ZAI_MODEL_ID:-glm-5.2}
+      # Embeddings via local OpenAI-compatible server (LM Studio, bge-m3).
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-http://localhost:1234/v1}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-lm-studio}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-bge-m3}
+      - EMBEDDING_DIM=${EMBEDDING_DIM:-1024}
     depends_on:
       - prometheus
       - jaeger

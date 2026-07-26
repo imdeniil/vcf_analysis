@@ -88,6 +88,15 @@ class MemoryOptimizationConfig:
         """Get the appropriate embedding dimensions based on configuration."""
         if self.dimension_reduction_enabled:
             return self.target_dimensions
+        # Allow overriding the embedding model dimensionality via env so the
+        # vector store schema matches the locally served embedding model
+        # (default bge-m3 -> 1024). Falls back to 1536 for OpenAI text-embedding-3.
+        env_dim = _os.getenv("EMBEDDING_DIM")
+        if env_dim:
+            try:
+                return int(env_dim)
+            except ValueError:
+                pass
         return 1536  # Original OpenAI embedding dimensions
     
     def is_optimized_model_enabled(self) -> bool:
