@@ -119,6 +119,36 @@ class ZAIReasoningModel(LiteLLMModel):
             formatted_messages.extend(formatted_tool_messages)
         return formatted_messages
 
+    def format_request(self, messages, tool_specs=None, system_prompt=None, tool_choice=None, *,
+                       system_prompt_content=None, **kwargs):
+        """Hybrid thinking policy for GLM-5.x reasoning models (Variant D).
+
+        GLM-5.2 spends its whole token budget on chain-of-thought and often
+        returns an EMPTY `content` after a tool call (Strands then ends the
+        turn with no answer). The fix is to disable thinking DURING tool
+        loops (tool calls are mechanical, CoT doesn't help and starves the
+        answer) and keep thinking ENABLED for the final analytical turn
+        (when no tools are offered). This yields: reliable tool calls with
+        non-empty results, plus deep reasoning for the summary/analysis.
+
+        Override point: when tool_specs is non-empty we inject
+        extra_body={"thinking": {"type": "disabled"}} into the litellm request,
+        which Z.AI honours (verified: reasoning_tokens drop to 0 and content
+        becomes non-empty). When tool_specs is empty/None we leave the default
+        (thinking enabled) so the model can reason about the analysis.
+        """
+        request = super().format_request(
+            messages, tool_specs, system_prompt, tool_choice,
+            system_prompt_content=system_prompt_content, **kwargs,
+        )
+        if tool_specs:
+            # Tools available -> this is a tool-decision turn. Disable CoT so the
+            # model emits a clean tool call (and later a clean text answer)
+            # instead of burning all tokens on reasoning.
+            request.setdefault("extra_body", {})
+            request["extra_body"].setdefault("thinking", {"type": "disabled"})
+        return request
+
 
 # Output mode toggling: chain-of-thought (CoT) vs. raw output
 # 1. Environment variable: VCF_AGENT_RAW_MODE ("1", "true", "yes" = raw)
@@ -254,8 +284,14 @@ def bcftools_view_tool(args: PyList[str]) -> str:
     """
     Run bcftools view with the given arguments.
 
+    `bcftools view` has NO option to limit the number of records and does NOT
+    support shell pipes (no `| head`). To preview a few records use
+    bcftools_query_tool instead, or filter by region: view -H file.vcf.gz chr1:1-100000.
+    Output of an unfiltered whole-genome file is ~tens of MB — always restrict
+    with a region when sampling.
+
     Args:
-        args (list): Arguments for bcftools view.
+        args (list): Arguments for bcftools view (e.g. ['-H', 'file.vcf.gz', 'chr17:43044295-43125483']).
     Returns:
         str: Output or error from bcftools.
     """
