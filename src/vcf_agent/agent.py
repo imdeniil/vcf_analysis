@@ -1110,6 +1110,56 @@ def get_cerebras_model(credential_manager=None):
         logging.error(f"Failed to initialize Cerebras model: {e}")
         raise
 
+
+@tool
+def find_similar_variants_tool(chrom: str, pos: int, ref: str, alt: str, limit: int = 10) -> str:
+    """
+    Find variants in the LanceDB vector store that are SEMANTICALLY SIMILAR to the
+    given variant (by embedding cosine distance). Use this to discover variants that
+    share functional/clinical characteristics even when their coordinates differ.
+
+    The query variant must already be present in the loaded VCF/LanceDB; it is looked
+    up by CHROM:POS REF>ALT and its stored bge-m3 embedding is used as the query vector.
+
+    Args:
+        chrom: Chromosome of the query variant, e.g. "chr1" (must match the VCF).
+        pos: Genomic position (1-based), e.g. 169519049.
+        ref: Reference allele, e.g. "T".
+        alt: Alternate allele, e.g. "C".
+        limit: Max number of similar variants to return (default 10).
+    Returns:
+        str: Table of the most similar variants with their coordinates and cosine
+             distance (lower = more similar; 0.0 = the query itself).
+    """
+    try:
+        import lancedb
+        from .config import SessionConfig
+        cfg = SessionConfig()
+        db = lancedb.connect(os.getenv("LANCEDB_PATH", cfg.memory_optimization and "/app/lancedb" or "/app/lancedb"))
+        table = db.open_table("variants")
+
+        # Build the same variant_id the loader uses: chrom-pos-ref-alt
+        query_id = f"{chrom}-{pos}-{ref}-{alt}"
+        df = table.to_pandas()
+        match = df[df["variant_id"] == query_id]
+        if match.empty:
+            # Fallback: positional match without strict allele check
+            match = df[(df["chrom"] == chrom) & (df["pos"] == pos)]
+        if match.empty:
+            return f"Variant {query_id} not found in LanceDB. Make sure the VCF was ingested."
+
+        query_vec = list(match.iloc[0]["embedding"])
+        results = table.search(query_vec, vector_column_name="embedding").limit(int(limit)).to_pandas()
+
+        lines = [f"Top-{limit} variants similar to {query_id}:", "CHROM\tPOS\tREF\tALT\tDISTANCE"]
+        for _, r in results.iterrows():
+            lines.append(f"{r['chrom']}\t{r['pos']}\t{r['ref']}\t{r['alt']}\t{r.get('_distance', float('nan')):.4f}")
+        return "\n".join(lines)
+    except Exception as e:
+        logging.error(f"find_similar_variants failed: {e}")
+        return f"Vector search failed: {e}"
+
+
 def get_agent_with_session(
     session_config: Optional[SessionConfig] = None,
     model_provider: Literal["ollama", "openai", "cerebras", "zai"] = "zai"
@@ -1215,6 +1265,7 @@ def get_agent_with_session(
         vcf_analysis_summary_tool, 
         vcf_summarization_tool,
         load_vcf_into_graph_db_tool,
+        find_similar_variants_tool,
     ]
 
     # Create agent with proper system prompt
