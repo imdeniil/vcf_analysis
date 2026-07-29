@@ -1,0 +1,100 @@
+4843	Height
+2565	Body mass index
+1737	Type 2 diabetes
+1397	Total cholesterol levels
+1221	Core binding factor acute myeloid leukemia
+1050	High density lipoprotein cholesterol levels
+983	Systolic blood pressure
+941	Low density lipoprotein cholesterol levels
+923	Electrocardiogram morphology (amplitude at temporal datapoints)
+911	Triglyceride levels
+884	Diastolic blood pressure
+870	Blood protein levels
+749	Platelet count
+732	Breast cancer
+720	Prostate cancer
+628	Serum metabolite levels
+627	Schizophrenia
+612	Triglycerides
+608	Pulse pressure
+605	Height (baseline)
+578	Sex hormone-binding globulin levels
+569	Crohn's disease
+564	Waist circumference adjusted for body mass index
+556	Inflammatory bowel disease
+552	Red blood cell count
+550	Waist-to-hip ratio adjusted for BMI
+544	White blood cell count
+529	Polyunsaturated fatty acid levels
+523	Total fatty acid levels
+509	Protein quantitative trait loci (liver)
+505	Rheumatoid arthritis
+502	Mean corpuscular volume
+501	Mean corpuscular hemoglobin
+499	Monounsaturated fatty acid levels
+490	Metabolic syndrome
+475	Hip circumference adjusted for BMI
+473	Linoleic acid levels
+472	Serum metabolite levels (CMS)
+472	Hematological traits (multi-trait analysis)
+462	Bone mineral density mean
+457	Metabolite levels
+444	Educational attainment
+442	HDL cholesterol levels
+441	Saturated fatty acids levels
+437	Total PHF-tau (SNP x SNP interaction)
+436	Heel bone mineral density
+432	Omega-6 fatty acid levels
+421	Coronary artery disease
+419	Ulcerative colitis
+398	Obesity-related traits
+395	C-reactive protein levels
+391	Monounsaturated fatty acids to total fatty acids percentage
+383	Psoriasis
+371	Urate levels
+368	Eosinophil count
+367	Omega-3 fatty acid levels
+365	Apolipoprotein B levels
+358	Colorectal cancer
+357	Serum alkaline phosphatase levels
+356	Waist-hip ratio
+339	IgG glycosylation
+338	Systemic lupus erythematosus
+333	Hematocrit
+330	Multi-trait sex score
+327	Waist-to-hip ratio adjusted for body mass index
+324	Apolipoprotein A1 levels
+322	HDL cholesterol
+317	Gamma glutamyl transferase levels
+315	Estimated glomerular filtration rate
+312	Creatinine levels
+308	Mean platelet volume
+308	Alanine aminotransferase levels
+307	Polyunsaturated fatty acids to monounsaturated fatty acids ratio
+304	Monocyte count
+303	Omega-6 fatty acids to total fatty acids percentage
+302	Lymphocyte count
+297	Multiple sclerosis
+296	Asthma
+296	Hemoglobin concentration
+296	Degree of unsaturation
+295	Smoking initiation
+289	Docosahexaenoic acid levels
+288	Neutrophil count
+285	Glycated hemoglobin levels
+278	LDL cholesterol levels
+277	Red cell distribution width
+272	Physical function (baseline)
+269	Aspartate aminotransferase levels
+269	Atrial fibrillation
+265	Hypothyroidism
+263	Waist-hip index
+258	Linoleic acid to total fatty acids percentage
+255	Weight
+252	Polyunsaturated fatty acids to total fatty acids percentage
+236	Insomnia
+231	QT interval
+229	LDL cholesterol
+229	Body mass index (MTAG)
+220	Refractive error
+220	Neurofibrillary tangles (SNP x SNP interaction)

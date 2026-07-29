@@ -1,0 +1,204 @@
+
+=== Внешность и телосложение ===
+4843	Height
+2565	Body mass index
+605	Height (baseline)
+564	Waist circumference adjusted for body mass index
+550	Waist-to-hip ratio adjusted for BMI
+475	Hip circumference adjusted for BMI
+398	Obesity-related traits
+356	Waist-hip ratio
+327	Waist-to-hip ratio adjusted for body mass index
+263	Waist-hip index
+255	Weight
+229	Body mass index (MTAG)
+171	Sex hormone-binding globulin levels adjusted for BMI
+141	Waist circumference adjusted for BMI (joint analysis main effects and physical activity interaction)
+138	Standing height (UKB data field 50)
+
+=== Питание и метаболизм ===
+1397	Total cholesterol levels
+1050	High density lipoprotein cholesterol levels
+941	Low density lipoprotein cholesterol levels
+911	Triglyceride levels
+628	Serum metabolite levels
+612	Triglycerides
+529	Polyunsaturated fatty acid levels
+523	Total fatty acid levels
+499	Monounsaturated fatty acid levels
+472	Serum metabolite levels (CMS)
+457	Metabolite levels
+442	HDL cholesterol levels
+441	Saturated fatty acids levels
+432	Omega-6 fatty acid levels
+391	Monounsaturated fatty acids to total fatty acids percentage
+
+=== Сердце и сосуды ===
+983	Systolic blood pressure
+884	Diastolic blood pressure
+421	Coronary artery disease
+269	Atrial fibrillation
+162	Venous thromboembolism
+132	Diastolic blood pressure (MTAG)
+120	Systolic blood pressure (MTAG)
+100	Coronary heart disease
+74	Blood pressure
+73	Venous thromboembolism (SNP x SNP interaction)
+60	Cardiovascular disease
+57	Atrial fibrillation (MTAG)
+50	Ischemic heart disease (PheCode 411)
+49	Heart failure
+46	Blood pressure (pleiotropy model 1 DBP adjusted for estimated causal effects x SBP)
+
+=== Рак ===
+1221	Core binding factor acute myeloid leukemia
+732	Breast cancer
+720	Prostate cancer
+358	Colorectal cancer
+138	Cancer
+132	Basal cell carcinoma
+102	Lung cancer
+90	Testicular germ cell tumor
+77	Chronic lymphocytic leukemia
+74	Pancreatic cancer
+71	Melanoma
+69	Skin cancer
+66	Non-melanoma skin cancer
+61	Prostate cancer (SNP x SNP interaction)
+57	Lung adenocarcinoma
+
+=== Нейро и психика ===
+627	Schizophrenia
+236	Insomnia
+205	Alzheimer's disease
+157	Parkinson's disease
+109	Intelligence
+106	Alzheimer's disease or family history of Alzheimer's disease
+101	Bipolar disorder
+98	Schizophrenia (MTAG)
+97	General cognitive ability
+83	Cognitive performance
+70	Neuroticism
+66	Alzheimer's disease (late onset)
+57	Memory decline in cognitive impairment
+55	Bipolar disorder and schizophrenia
+54	Depression
+
+=== Иммунитет ===
+569	Crohn's disease
+556	Inflammatory bowel disease
+505	Rheumatoid arthritis
+383	Psoriasis
+338	Systemic lupus erythematosus
+296	Asthma
+157	Hypothyroidism or rheumatoid arthritis (pleiotropy)
+119	Chronic inflammatory diseases (ankylosing spondylitis, Crohn's disease, psoriasis, primary sclerosing cholangitis, ulcerative colitis) (pleiotropy)
+91	Asthma (childhood onset)
+88	Systemic lupus erythematosus (MTAG)
+69	Rheumatoid arthritis (rheumatoid factor and/or anti-cyclic citrullinated peptide seropositive)
+60	Rheumatoid arthritis or type 1 diabetes
+56	Rheumatoid arthritis (ACPA-positive)
+53	Rheumatoid arthritis or inflammatory bowel disease
+46	Autoimmune hypothyroidism
+
+=== Кожа и волосы ===
+111	Atopic dermatitis
+74	Hair color
+42	Blond vs. brown/black hair color
+41	Eczema
+35	Skin pigmentation traits
+29	Skin pigmentation
+28	Brown vs. black hair color
+26	Hay fever and/or eczema
+25	Hair morphology traits
+20	Sunburns
+17	Seborrheic dermatitis (PheCode 690.1)
+16	Red vs. brown/black hair color
+8	Acne (severe)
+8	Red vs non-red hair color
+8	acne vulgaris
+
+=== Спорт ===
+52	Hand grip strength (baseline)
+22	Hand grip strength
+14	Hand grip strength right (UKB data field 47)
+7	Hand grip strength left (UKB data field 46)
+5	Vigorous physical activity
+5	Sodium-coupled monocarboxylate transporter 1 levels
+4	Cardiorespiratory fitness (vo2 max)
+4	Low hand grip strength (60 years and older) (EWGSOP)
+3	Cardiac muscle measurement
+3	Posterior thigh muscle volume
+3	Thigh slabs internal fat to muscle ratio
+2	Urea transporter 2 levels (SLC14A2.12818.159.3)
+2	Moderate to vigorous physical activity levels
+2	Strenuous sports or other exercises
+2	Comprehensive strength and appendicular lean mass
+
+=== Восприятие ===
+92	Color vision defects (Tritan)
+46	Color vision defects (Deutan-Protan)
+46	Pain (pleiotropy)
+34	Pain intensity (NRS pain scale 0-11)
+26	Age-related hearing impairment
+16	Hearing loss
+16	Hearing difficulty
+13	Age-related hearing impairment (SNP x SNP interaction)
+12	Pain intensity (without opioid use disorder)
+10	Hearing aid use
+8	Leisure sedentary behaviour (television watching)
+8	Hearing difficulty and hearing difficulty with background noise
+7	Hearing problems
+6	Multisite chronic pain
+6	Age-related hearing impairment (MTAG)
+
+=== Зависимости ===
+295	Smoking initiation
+79	Substance use disorder
+61	Smoking initiation (ever regular vs never regular) (MTAG)
+53	Medication use (drugs used in diabetes)
+42	Alcohol consumption (drinks per week)
+41	Smoking initiation (ever regular vs never regular)
+40	Nonalcoholic fatty liver disease
+39	Pulmonary function (smoking interaction)
+35	Alcohol dependence
+30	Alcohol consumption
+30	Smoking cessation
+30	Smoking behavior
+29	Alcohol dependence (codominant genetic model)
+27	Alcohol consumption (drinks per week) (MTAG)
+26	Alcohol use disorder
+
+=== Кровь ===
+870	Blood protein levels
+749	Platelet count
+552	Red blood cell count
+544	White blood cell count
+501	Mean corpuscular hemoglobin
+333	Hematocrit
+308	Mean platelet volume
+296	Hemoglobin concentration
+285	Glycated hemoglobin levels
+204	Hemoglobin levels
+200	Mean corpuscular hemoglobin concentration
+143	Hemoglobin
+115	Hemoglobin A1c levels
+109	Plateletcrit
+109	Mean platelet thrombocyte volume (UKB data field 30100)
+
+=== Гормоны ===
+578	Sex hormone-binding globulin levels
+265	Hypothyroidism
+215	Testosterone levels
+178	Total testosterone levels
+117	Thyroid stimulating hormone levels
+86	Bioavailable testosterone levels
+58	Thyroid hormone levels
+51	Free testosterone levels
+36	Medication use (thyroid preparations)
+33	Sex hormone-binding globulin levels in postmenopausal women
+25	Hypothyroidism NOS (PheCode 244.4)
+25	Sex hormone-binding globulin levels and heel estimated bone mineral density
+23	Hypothyroidism (PheCode 244)
+20	Lymphocytic thyroiditis
+18	Takes medication for Thyroid problems?
