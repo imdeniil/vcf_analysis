@@ -1,7 +1,6 @@
 version: '3.8'
 
 volumes:
-  grafana_data: {}
   lancedb_data: {}
   kuzu_data: {}
   vcf_data: {}
@@ -12,7 +11,7 @@ networks:
 
 services:
   # =============================================================================
-  # VCF Analysis Agent - Main Application
+  # VCF Analysis Agent - Main Application (standalone, no observability stack)
   # =============================================================================
   vcf-agent:
     build:
@@ -27,11 +26,9 @@ services:
     networks:
       - vcf_network
     ports:
-      - "8000:8000"  # Main application port
-    # Keep the container alive as a long-running service (the default CMD just
-    # imports vcf_agent and exits, which combined with restart:unless-stopped
-    # causes a restart loop). Tail /dev/null to idle; drive the agent via
-    # `docker compose exec vcf-agent python -m vcf_agent.cli ...`.
+      - "8000:8000"  # Main application port (Prometheus metrics, if needed)
+    # Keep the container alive as a long-running service.
+    # Drive the agent via `docker compose exec vcf-agent python -m vcf_agent.cli ...`.
     command: ["tail", "-f", "/dev/null"]
     volumes:
       - vcf_data:/app/data
@@ -46,8 +43,6 @@ services:
       - PYTHONUNBUFFERED=1
       - LANCEDB_PATH=/app/lancedb
       - KUZU_PATH=/app/kuzu_db
-      - PROMETHEUS_GATEWAY=http://prometheus:9090
-      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
       - LOG_LEVEL=INFO
       # Z.AI (GLM) model provider (default). Coding Plan endpoint.
       - ZAI_API_KEY=${ZAI_API_KEY:-}
@@ -59,9 +54,6 @@ services:
       - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-lm-studio}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-bge-m3}
       - EMBEDDING_DIM=${EMBEDDING_DIM:-1024}
-    depends_on:
-      - prometheus
-      - jaeger
     healthcheck:
       test: ["CMD", "python", "-c", "import vcf_agent; print('healthy')"]
       interval: 30s
@@ -97,128 +89,3 @@ services:
     profiles:
       - development
     command: ["bash"]
-
-  # =============================================================================
-  # Observability Stack
-  # =============================================================================
-  jaeger:
-    image: jaegertracing/all-in-one:1.52
-    container_name: jaeger_vcf_agent
-    restart: unless-stopped
-    networks:
-      - vcf_network
-    ports:
-      # OTLP gRPC receiver
-      - "4317:4317"
-      # OTLP HTTP receiver
-      - "4318:4318"
-      # Jaeger UI
-      - "16686:16686"
-      # Prometheus metrics from Jaeger itself
-      - "16687:16687"
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-      - LOG_LEVEL=info
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:16686/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  prometheus:
-    image: prom/prometheus:v2.48.0
-    container_name: prometheus_vcf_agent
-    restart: unless-stopped
-    networks:
-      - vcf_network
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./config/prometheus:/etc/prometheus/config:ro
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  grafana:
-    image: grafana/grafana-oss:10.2.2
-    container_name: grafana_vcf_agent
-    restart: unless-stopped
-    networks:
-      - vcf_network
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
-    depends_on:
-      - prometheus
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # =============================================================================
-  # Optional: Ollama for Local LLM Support
-  # =============================================================================
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama_vcf_agent
-    restart: unless-stopped
-    networks:
-      - vcf_network
-    ports:
-      - "11434:11434"
-    volumes:
-      - ./ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    profiles:
-      - ollama
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # =============================================================================
-  # Optional: MinIO for S3-compatible Storage
-  # =============================================================================
-  minio:
-    image: minio/minio:RELEASE.2023-12-02T10-51-33Z
-    container_name: minio_vcf_agent
-    restart: unless-stopped
-    networks:
-      - vcf_network
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - ./minio_data:/data
-    environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin123
-    command: server /data --console-address ":9001"
-    profiles:
-      - storage
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3 
